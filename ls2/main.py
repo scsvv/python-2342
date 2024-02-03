@@ -64,7 +64,7 @@
 # Ожидаемый результат: {'music', 'movies', 'books', 'sports', 'cooking', 'travel'}
 
 from time import perf_counter
-from functools import wrapss
+from functools import wraps
 
 def memoize(func):
     cache = {}
