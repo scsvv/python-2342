@@ -12,10 +12,17 @@ from aiogram.utils.markdown import hbold
 from aiogram.fsm.storage.memory import SimpleEventIsolation
 from aiogram.fsm.scene import Scene, SceneRegistry, ScenesManager, on
 from aiogram.fsm.context import FSMContext
-from aiogram.utils.keyboard import KeyboardBuilder
+from aiogram.utils.keyboard import ReplyKeyboardBuilder
 
-TOKEN=""
-print(TOKEN)
+from aiogram.utils.formatting import (
+    as_list, 
+    as_section,
+    as_numbered_list, 
+    as_key_value,
+    Bold,
+)
+
+TOKEN="6911940544:AAGpjztafmEFpwTd-4Drk9R4m7x-OTzEpBQ"
 
 @dataclass
 class Answer: 
@@ -137,19 +144,79 @@ class QuizScene(Scene, state="quiz"):
         except IndexError:
             return await self.wizard.exit()
         
-        markup = KeyboardBuilder()
+        markup = ReplyKeyboardBuilder()
         markup.add(*[KeyboardButton(text=answer.text) for answer in quiz.answers])
 
         if step > 0:
-            markup.add(text="Back")
-        markup.add(text="Exit")
+            markup.button(text="Back")
+        markup.button(text="Exit")
 
         await state.update_data(step=step)
         return await message.answer(
             text=QUESTIONS[step].text, 
             reply_markup=markup.adjust(2).as_markup(resize_keyboard=True),
         )
+    
+    @on.message.exit()
+    async def on_exit(self, message: Message, state: FSMContext):
+        data = await state.get_data()
+        answers = data.get("answers", {})
 
+        correct, incorrect = 0, 0
+        user_answers = []
+        for step, quiz in enumerate(QUESTIONS):
+            answer = answers.get(step)
+            is_correct = answer == quiz.correct_answer
+            if is_correct:
+                correct += 1
+                icon = "✅"
+            else:
+                incorrect += 1
+                icon = "❌"
+            if answer is None:
+                answer = "No answer"
+            user_answers.append(f"{quiz.text} ({icon} {html.quote(answer)})")
+        
+        content = as_list(
+            as_section(
+                Bold("Your answers: "),
+                as_numbered_list(*user_answers),
+            ),
+            "",
+            as_list(
+                as_key_value("Correct", correct),
+                as_key_value("Inncorect", incorrect)
+            )
+        )
+        await message.answer(**content.as_kwargs(), reply_markup=ReplyKeyboardRemove())
+        await state.set_data({})
+    
+    @on.message(F.text=="Back")
+    async def back(self, message: Message, state: FSMContext):
+        data = await state.get_data()
+        step = data["step"]
+        prev = step -1
+        if prev < 0:
+            return self.wizard.exit()
+        return await self.wizard.back(step=prev)
+    
+    @on.message(F.text=="Exit")
+    async def exit(self, message: Message):
+            return self.wizard.exit()
+    
+    @on.message(F.text)
+    async def answer(self, message: Message, state: FSMContext):
+        data = await state.get_data()
+        step = data.get("step", 0)
+        answers = data.get("answers", {})
+        answers[step] = message.text
+        await state.update_data(answers=answers)
+        await self.wizard.retake(step=step+1)
+
+    @on.message()
+    async def unknown_messages(self, message: Message):
+        await message.answer("Please select on answer")
+        
 quiz_router = Router(name=__name__)
 quiz_router.message.register(QuizScene.as_handler(), Command("quiz"))
 
