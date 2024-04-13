@@ -93,15 +93,15 @@ if __name__ == '__main__':
     print(f)
     print(f"Time: {end - start} seconds\n")
 
-# def my_decarator(func):
-#     def wrapper():
-#         print("Что - то до начала")
-#         func()
-#         print("Что - то после")
-#     return wrapper
+def my_decarator(func):
+    def wrapper():
+        print("Что - то до начала")
+        func()
+        print("Что - то после")
+    return wrapper
 
-# @my_decarator
-# def my_func():
-#     print("Hello World")
+@my_decarator
+def my_func():
+    print("Hello World")
 
-# my_func()
+my_func()
